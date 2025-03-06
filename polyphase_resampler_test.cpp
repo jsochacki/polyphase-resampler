@@ -37,8 +37,8 @@ polyphase_resampler_float_test(void)
    // passband).
    size_t  number_of_samples    = 10000;
    T_data* input_signal         = new T_data[number_of_samples];
-   T       tone_freq_passband   = (output_rate / 2) - (output_rate / 316);
-   T       tone_freq_rejectband = output_rate * 2;
+   T       tone_freq_passband   = (output_rate / 2) - 2*(output_rate / 316);
+   T       tone_freq_rejectband = (output_rate / 2) + 2*(output_rate / 316);
    for(size_t n = 0; n < number_of_samples; ++n)
    {
       T t                = static_cast<T>(n) / input_rate;
@@ -177,8 +177,8 @@ polyphase_resampler_double_test(void)
    // passband).
    size_t  number_of_samples    = 10000;
    T_data* input_signal         = new T_data[number_of_samples];
-   T       tone_freq_passband   = (output_rate / 2) - (output_rate / 316);
-   T       tone_freq_rejectband = output_rate * 2;
+   T       tone_freq_passband   = (output_rate / 2) - 2*(output_rate / 316);
+   T       tone_freq_rejectband = (output_rate / 2) + 2*(output_rate / 316);
    for(size_t n = 0; n < number_of_samples; ++n)
    {
       T t                = static_cast<T>(n) / input_rate;

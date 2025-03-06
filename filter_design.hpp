@@ -68,7 +68,8 @@ design_raised_cosine_filter(int filter_order, T cutoff, T rolloff, T fs)
    std::vector<T> h(filter_order, 0.0f);
 
    T center_tap    = T(filter_order - 1) / T(2);
-   T symbol_period = T(1) / (T(2) * cutoff);
+   //T symbol_period = T(1) / (T(2) * cutoff);
+   T symbol_period = T(1) / cutoff;
 
    // Compute the impulse response at each tap.
    for(uint16_t n = 0; n < filter_order; ++n)
