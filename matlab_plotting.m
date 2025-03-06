@@ -25,3 +25,9 @@ plot(10*log10(fftshift(abs(fft(output_signal, length(output_signal))))))
 plot(real(output_signal))
 
 fvtool(h)
+
+
+mlresult = upfirdn(input_signal, h, 4, 125);
+plot(linspace(0,1920000,length(mlresult)), 10*log10(abs(fft(mlresult, length(mlresult)))))
+plot(10*log10(fftshift(abs(fft(mlresult, length(mlresult))))))
+plot(real(mlresult))
