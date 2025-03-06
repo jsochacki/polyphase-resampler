@@ -1,0 +1,5 @@
+.*.view
+*.pdf
+mermaid*
+filter_design_test
+polyphase_resampler_test
