@@ -126,6 +126,9 @@ design_raised_cosine_filter(T   input_rate,
    T upsampled_sample_rate = input_rate * conv.up_factor;
    T design_cutoff         = (input_rate * static_cast<T>(conv.up_factor))
                      / static_cast<T>(conv.down_factor);
+
+   //std::printf("upsampled sample rate= %e\n", upsampled_sample_rate);
+   //std::printf("design cutoff = %e\n", design_cutoff);
    return design_raised_cosine_filter<T>(filter_order,
                                          design_cutoff,
                                          rolloff,
