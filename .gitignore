@@ -3,3 +3,6 @@
 mermaid*
 filter_design_test
 polyphase_resampler_test
+input_signal.txt
+output_signal.txt
+filter_coefficients.txt

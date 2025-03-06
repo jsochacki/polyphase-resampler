@@ -3,9 +3,9 @@
 
 #include <cfloat>
 #include <cmath>
-#include <vector>
-#include <cstdio>
 #include <cstdint>
+#include <cstdio>
+#include <vector>
 
 template<typename T>
 inline T
@@ -18,6 +18,37 @@ get_epsilon_for_type(void)
       static_assert(std::is_same_v<T, float> || std::is_same_v<T, double>,
                     "get_epsilon_for_type only supports float and double");
    }
+}
+
+typedef struct
+{
+   int up_factor;
+   int down_factor;
+} up_down_factors;
+
+inline int
+gcd_int(int a, int b)
+{
+   while(b != 0)
+   {
+      int temp = a % b;
+      a        = b;
+      b        = temp;
+   }
+   return a;
+}
+
+template<typename T>
+inline up_down_factors
+compute_conversion_factors(T input_rate, T target_rate)
+{
+   int             input_rate_int  = static_cast<int>(input_rate);
+   int             target_rate_int = static_cast<int>(target_rate);
+   int             gcd_val         = gcd_int(target_rate_int, input_rate_int);
+   up_down_factors conv;
+   conv.up_factor   = target_rate_int / gcd_val;
+   conv.down_factor = input_rate_int / gcd_val;
+   return conv;
 }
 
 // Raised cosine FIR design function.
@@ -74,10 +105,32 @@ design_raised_cosine_filter(int filter_order, T cutoff, T rolloff, T fs)
 
    // Normalize the filter coefficients so that their sum equals unity.
    T sum = T(0);
-   for(int n = 0; n < filter_order; n++) { sum += h[n]; }
-   for(int n = 0; n < filter_order; n++) { h[n] /= sum; }
+   for(int n = 0; n < filter_order; ++n) { sum += h[n]; }
+   for(int n = 0; n < filter_order; ++n) { h[n] /= sum; }
 
    return h;
 }
+
+template<typename T>
+inline std::vector<T>
+design_raised_cosine_filter(T   input_rate,
+                            T   output_rate,
+                            int filter_order,
+                            T   rolloff)
+{
+   up_down_factors conv
+      = compute_conversion_factors<T>(input_rate, output_rate);
+   // std::printf("Conversion ratio: up_factor = %d, down_factor = %d\n",
+   // conv.up_factor, conv.down_factor);
+
+   T upsampled_sample_rate = input_rate * conv.up_factor;
+   T design_cutoff         = (input_rate * static_cast<T>(conv.up_factor))
+                     / static_cast<T>(conv.down_factor);
+   return design_raised_cosine_filter<T>(filter_order,
+                                         design_cutoff,
+                                         rolloff,
+                                         upsampled_sample_rate);
+}
+
 
 #endif /* FILTER_DESIGN_H_ */

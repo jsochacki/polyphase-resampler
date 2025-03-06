@@ -10,7 +10,7 @@ main()
    float fs           = 32.0f;
 
    std::vector<float> h
-      = designRaisedCosineFIR<float>(filter_order, cutoff, rolloff, fs);
+      = design_raised_cosine_filter<float>(filter_order, cutoff, rolloff, fs);
 
    for(float coef : h) { printf("%f\n", coef); }
 
@@ -21,7 +21,7 @@ main()
    double dfs           = 32.0d;
 
    std::vector<double> dh
-      = designRaisedCosineFIR<double>(filter_order, cutoff, rolloff, fs);
+      = design_raised_cosine_filter<double>(filter_order, cutoff, rolloff, fs);
 
    for(double coef : dh) { printf("%f\n", coef); }
 
