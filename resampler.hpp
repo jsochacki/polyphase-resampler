@@ -9,46 +9,49 @@
 typedef float  complex_float[2];
 typedef double complex_double[2];
 
+template<typename T_complex>
 inline void
-complex_set_zero(complex_float out)
+complex_set_zero(T_complex out)
 {
    out[0] = 0.0f;
    out[1] = 0.0f;
 }
 
+template<typename T_complex>
 inline void
-complex_copy(const complex_float src, complex_float dst)
+complex_copy(const T_complex src, T_complex dst)
 {
    dst[0] = src[0];
    dst[1] = src[1];
 }
 
+template<typename T_complex, typename T>
 inline void
-complex_accumulate(complex_float       accumulator,
-                   const complex_float in,
-                   float               scalar)
+complex_accumulate(T_complex accumulator,
+                   const T_complex in,
+                   T scalar)
 {
    accumulator[0] += in[0] * scalar;
    accumulator[1] += in[1] * scalar;
 }
 
 // polyphase_resample
-// Performs polyphase resampling on an input array of complex_float samples
+// Performs polyphase resampling on an input array of T_data samples
 // using a full FIR filter. The function takes the input and desired output
 // sampling rates (of type T), computes integer conversion factors, and uses
-// the provided full FIR filter (designed via design_raised_cosine_fir) for
+// the provided full FIR filter (designed via design_raised_cosine_filter) for
 // filtering. Parameters:
-//   input               : pointer to input complex signal (complex_float*)
+//   input               : pointer to input complex signal (T_data*)
 //   input_size          : number of input samples
 //   input_sampling_rate : sampling rate of the input signal (Hz)
 //   output_sampling_rate: desired output sampling rate (Hz)
 //   full_filter         : full FIR filter coefficients
 //   output_size         : (output) number of output samples computed
-// Returns a dynamically allocated array of complex_float samples (caller must
+// Returns a dynamically allocated array of T_data samples (caller must
 // delete[]).
-template<typename T>
-inline complex_float*
-polyphase_resample(const complex_float*  input,
+template<typename T_data, typename T>
+inline T_data*
+polyphase_resample(const T_data*  input,
                    size_t                input_size,
                    T                     input_sampling_rate,
                    T                     output_sampling_rate,
@@ -98,22 +101,22 @@ polyphase_resample(const complex_float*  input,
 
    size_t max_output_samples
       = (((input_size - delay) * up_factor) / down_factor) + 1;
-   complex_float* output_buffer = new complex_float[max_output_samples];
+   T_data* output_buffer = new T_data[max_output_samples];
    size_t         out_count     = 0;
 
    while(input_index < static_cast<int>(input_size))
    {
-      complex_float y;
-      complex_set_zero(y);
+      T_data y;
+      complex_set_zero<T_data>(y);
       for(int k = 0; k < phase_length; ++k)
       {
          int idx = input_index - k;
          if(idx < 0) { break; }
-         complex_accumulate(y,
+         complex_accumulate<T_data, T>(y,
                             input[idx],
                             static_cast<float>(poly_filters[phase][k]));
       }
-      complex_copy(y, output_buffer[out_count]);
+      complex_copy<T_data>(y, output_buffer[out_count]);
       out_count++;
 
       phase += down_factor;

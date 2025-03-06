@@ -5,10 +5,11 @@ inline void
 polyphase_resampler_float_test(void)
 {
    using T          = float;
+   using T_data     = complex_float;
    T   input_rate   = static_cast<T>(60e6);
    T   output_rate  = static_cast<T>(1.92e6);
    T   rolloff      = T(0.1);
-   int filter_order = 1 << 12; //1 << 10 sufficient for RF sampling rates
+   int filter_order = 1 << 12;   // 1 << 10 sufficient for RF sampling rates
 
    std::vector<T> full_filter = design_raised_cosine_filter(input_rate,
                                                             output_rate,
@@ -25,23 +26,19 @@ polyphase_resampler_float_test(void)
    {
       // Print with conditional formatting for the sign.
       if(full_filter[i] >= 0)
-         std::fprintf(file_coeff,
-                      "+%f\n",
-                      full_filter[i]);
+         std::fprintf(file_coeff, "+%f\n", full_filter[i]);
       else
-         std::fprintf(file_coeff,
-                      "%f\n",
-                      full_filter[i]);
+         std::fprintf(file_coeff, "%f\n", full_filter[i]);
    }
    std::fclose(file_coeff);
 
 
    // Generate an input signal: a pure tone at 1.92 MHz / 2 (within the
    // passband).
-   size_t         number_of_samples    = 10000;
-   complex_float* input_signal         = new complex_float[number_of_samples];
-   T              tone_freq_passband   = (output_rate / 2) - (output_rate / 316);
-   T              tone_freq_rejectband = output_rate * 2;
+   size_t  number_of_samples    = 10000;
+   T_data* input_signal         = new T_data[number_of_samples];
+   T       tone_freq_passband   = (output_rate / 2) - (output_rate / 316);
+   T       tone_freq_rejectband = output_rate * 2;
    for(size_t n = 0; n < number_of_samples; ++n)
    {
       T t                = static_cast<T>(n) / input_rate;
@@ -52,13 +49,13 @@ polyphase_resampler_float_test(void)
    }
 
    // Resample using the polyphase resampler.
-   size_t         output_size   = 0;
-   complex_float* output_signal = polyphase_resample<T>(input_signal,
-                                                        number_of_samples,
-                                                        input_rate,
-                                                        output_rate,
-                                                        full_filter,
-                                                        output_size);
+   size_t  output_size   = 0;
+   T_data* output_signal = polyphase_resample<T_data, T>(input_signal,
+                                                 number_of_samples,
+                                                 input_rate,
+                                                 output_rate,
+                                                 full_filter,
+                                                 output_size);
 
 
    FILE* file_in = std::fopen("input_signal.txt", "w");
@@ -143,7 +140,6 @@ polyphase_resampler_float_test(void)
    delete[] input_signal;
    delete[] output_signal;
 }
-
 
 
 int
