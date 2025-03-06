@@ -8,7 +8,7 @@ polyphase_resampler_float_test(void)
    using T_data     = complex_float;
    T   input_rate   = static_cast<T>(60e6);
    T   output_rate  = static_cast<T>(1.92e6);
-   T   rolloff      = T(0.1);
+   T   rolloff      = T(0.01);
    int filter_order = 1 << 12;   // 1 << 10 sufficient for RF sampling rates
 
    std::vector<T> full_filter = design_raised_cosine_filter(input_rate,
@@ -37,8 +37,8 @@ polyphase_resampler_float_test(void)
    // passband).
    size_t  number_of_samples    = 10000;
    T_data* input_signal         = new T_data[number_of_samples];
-   T       tone_freq_passband   = (output_rate / 2) - 2*(output_rate / 316);
-   T       tone_freq_rejectband = (output_rate / 2) + 2*(output_rate / 316);
+   T       tone_freq_passband   = (output_rate / 2) - 8*(output_rate / 316);
+   T       tone_freq_rejectband = (output_rate / 2) + 8*(output_rate / 316);
    for(size_t n = 0; n < number_of_samples; ++n)
    {
       T t                = static_cast<T>(n) / input_rate;
@@ -148,7 +148,7 @@ polyphase_resampler_double_test(void)
    using T_data     = complex_double;
    T   input_rate   = static_cast<T>(60e6);
    T   output_rate  = static_cast<T>(1.92e6);
-   T   rolloff      = T(0.1);
+   T   rolloff      = T(0.01);
    int filter_order = 1 << 12;   // 1 << 10 sufficient for RF sampling rates
 
    std::vector<T> full_filter = design_raised_cosine_filter(input_rate,
@@ -177,8 +177,8 @@ polyphase_resampler_double_test(void)
    // passband).
    size_t  number_of_samples    = 10000;
    T_data* input_signal         = new T_data[number_of_samples];
-   T       tone_freq_passband   = (output_rate / 2) - 2*(output_rate / 316);
-   T       tone_freq_rejectband = (output_rate / 2) + 2*(output_rate / 316);
+   T       tone_freq_passband   = (output_rate / 2) - 8*(output_rate / 316);
+   T       tone_freq_rejectband = (output_rate / 2) + 8*(output_rate / 316);
    for(size_t n = 0; n < number_of_samples; ++n)
    {
       T t                = static_cast<T>(n) / input_rate;
