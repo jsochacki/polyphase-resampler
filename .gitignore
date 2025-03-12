@@ -3,10 +3,5 @@
 mermaid*
 filter_design_test
 polyphase_resampler_test
-float_input_signal.txt
-float_output_signal.txt
-float_filter_coefficients.txt
-double_input_signal.txt
-double_output_signal.txt
-double_filter_coefficients.txt
+*.txt
 matlab_plotting.asv

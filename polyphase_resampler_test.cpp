@@ -1,291 +1,258 @@
 #include "filter_design.hpp"
 #include "resampler.hpp"
 
-inline void
-polyphase_resampler_float_test(void)
+// Just for timing
+#include <chrono>
+#include <string>
+
+template<typename T, typename T_data>
+inline void test_polyphase_resampler(const std::string &prefix,
+                                     size_t number_of_samples,
+                                     T input_rate,
+                                     T output_rate,
+                                     int filter_order,
+                                     T rolloff)
 {
-   using T          = float;
-   using T_data     = complex_float;
-   T   input_rate   = static_cast<T>(60e6);
-   T   output_rate  = static_cast<T>(1.92e6);
-   T   rolloff      = T(0.01);
-   int filter_order = 1 << 12;   // 1 << 10 sufficient for RF sampling rates
+   // Design the raised cosine filter.
+   std::vector<T> full_filter = design_raised_cosine_filter(input_rate, output_rate, filter_order, rolloff);
 
-   std::vector<T> full_filter = design_raised_cosine_filter(input_rate,
-                                                            output_rate,
-                                                            filter_order,
-                                                            rolloff);
-
-   FILE* file_coeff = std::fopen("float_filter_coefficients.txt", "w");
-   if(file_coeff == nullptr)
+   auto start = std::chrono::high_resolution_clock::now();
+   // Write filter coefficients to file.
+   std::string coeff_file_name = prefix + "_filter_coefficients.txt";
+   FILE* file_coeff = std::fopen(coeff_file_name.c_str(), "w");
+   if (file_coeff == nullptr)
    {
-      std::perror("Error opening float_filter_coefficients.txt for writing");
+      std::perror(("Error opening " + coeff_file_name + " for writing").c_str());
       return;
    }
-   for(size_t i = 0; i < full_filter.size(); ++i)
+   for (size_t i = 0; i < full_filter.size(); ++i)
    {
-      // Print with conditional formatting for the sign.
-      if(full_filter[i] >= 0)
+      if (full_filter[i] >= 0)
          std::fprintf(file_coeff, "+%.24f\n", full_filter[i]);
       else
          std::fprintf(file_coeff, "%.24f\n", full_filter[i]);
    }
    std::fclose(file_coeff);
+   auto end = std::chrono::high_resolution_clock::now();
+   auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+   printf("%s_filter_coefficients_write duration: %lld microseconds\n", prefix.c_str(), (long long)duration);
 
 
-   // Generate an input signal: a pure tone at 1.92 MHz / 2 (within the
-   // passband).
-   size_t  number_of_samples    = 10000;
-   T_data* input_signal         = new T_data[number_of_samples];
-   T       tone_freq_passband   = (output_rate / 2) - 8*(output_rate / 316);
-   T       tone_freq_rejectband = (output_rate / 2) + 8*(output_rate / 316);
-   for(size_t n = 0; n < number_of_samples; ++n)
+   // Generate an input signal.
+   // We generate a composite tone: one frequency in the passband and one in the rejectband.
+   T_data* input_signal = new T_data[number_of_samples];
+   T tone_freq_passband   = (output_rate / 2) - 8 * (output_rate / 316);
+   T tone_freq_rejectband = (output_rate / 2) + 8 * (output_rate / 316);
+   for (size_t n = 0; n < number_of_samples; ++n)
    {
-      T t                = static_cast<T>(n) / input_rate;
+      T t = static_cast<T>(n) / input_rate;
       input_signal[n][0] = std::cos(2.0 * M_PI * tone_freq_passband * t);
       input_signal[n][1] = std::sin(2.0 * M_PI * tone_freq_passband * t);
       input_signal[n][0] += std::cos(2.0 * M_PI * tone_freq_rejectband * t);
       input_signal[n][1] += std::sin(2.0 * M_PI * tone_freq_rejectband * t);
    }
 
-   // Resample using the polyphase resampler.
-   size_t  output_size   = 0;
+   // Resample using the polyphase_resample function and measure its duration.
+   size_t output_size = 0;
+   start = std::chrono::high_resolution_clock::now();
    T_data* output_signal = polyphase_resample<T_data, T>(input_signal,
-                                                         number_of_samples,
-                                                         input_rate,
-                                                         output_rate,
-                                                         full_filter,
-                                                         output_size);
+                                                          number_of_samples,
+                                                          input_rate,
+                                                          output_rate,
+                                                          full_filter,
+                                                          output_size);
+   end = std::chrono::high_resolution_clock::now();
+   duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+   printf("%s polyphase_resample Duration: %lld microseconds\n", prefix.c_str(), (long long)duration);
+   printf("number of output samples: %ld \n", output_size);
 
-
-   FILE* file_in = std::fopen("float_input_signal.txt", "w");
-   if(file_in == nullptr)
+   start = std::chrono::high_resolution_clock::now();
+   // Write the input signal to file.
+   std::string input_file_name = prefix + "_input_signal.txt";
+   FILE* file_in = std::fopen(input_file_name.c_str(), "w");
+   if (file_in == nullptr)
    {
-      std::perror("Error opening float_input_signal.txt for writing");
+      std::perror(("Error opening " + input_file_name + " for writing").c_str());
       delete[] input_signal;
       delete[] output_signal;
       return;
    }
-   for(size_t i = 0; i < number_of_samples; ++i)
+   for (size_t i = 0; i < number_of_samples; ++i)
    {
-      // Print with conditional formatting for the sign.
-      if(input_signal[i][1] >= 0)
-         std::fprintf(file_in,
-                      "%.24f+%.24fi\n",
-                      input_signal[i][0],
-                      input_signal[i][1]);
+      if (input_signal[i][1] >= 0)
+         std::fprintf(file_in, "%.24f+%.24fi\n", input_signal[i][0], input_signal[i][1]);
       else
-         std::fprintf(file_in,
-                      "%.24f%.24fi\n",
-                      input_signal[i][0],
-                      input_signal[i][1]);
+         std::fprintf(file_in, "%.24f%.24fi\n", input_signal[i][0], input_signal[i][1]);
    }
    std::fclose(file_in);
+   end = std::chrono::high_resolution_clock::now();
+   duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+   printf("%s_input_signal write duration: %lld microseconds\n", prefix.c_str(), (long long)duration);
 
-   // Write the output signal to a text file.
-   FILE* file_out = std::fopen("float_output_signal.txt", "w");
-   if(file_out == nullptr)
+   start = std::chrono::high_resolution_clock::now();
+   // Write the output signal to file.
+   std::string output_file_name = prefix + "_output_signal.txt";
+   FILE* file_out = std::fopen(output_file_name.c_str(), "w");
+   if (file_out == nullptr)
    {
-      std::perror("Error opening float_output_signal.txt for writing");
+      std::perror(("Error opening " + output_file_name + " for writing").c_str());
       delete[] input_signal;
       delete[] output_signal;
       return;
    }
-   for(size_t i = 0; i < output_size; ++i)
+   for (size_t i = 0; i < output_size; ++i)
    {
-      if(output_signal[i][1] >= 0)
-         std::fprintf(file_out,
-                      "%.24f+%.24fi\n",
-                      output_signal[i][0],
-                      output_signal[i][1]);
+      if (output_signal[i][1] >= 0)
+         std::fprintf(file_out, "%.24f+%.24fi\n", output_signal[i][0], output_signal[i][1]);
       else
-         std::fprintf(file_out,
-                      "%.24f%.24fi\n",
-                      output_signal[i][0],
-                      output_signal[i][1]);
+         std::fprintf(file_out, "%.24f%.24fi\n", output_signal[i][0], output_signal[i][1]);
    }
    std::fclose(file_out);
-
-   // Compute the average magnitude of the signals
-   T sum_mag_in  = 0;
-   T sum_mag_out = 0;
-   for(size_t i = 0; i < output_size; ++i)
-   {
-      T mag = std::sqrt(input_signal[i][0] * input_signal[i][0]
-                        + input_signal[i][1] * input_signal[i][1]);
-      sum_mag_in += mag;
-
-      mag = std::sqrt(output_signal[i][0] * output_signal[i][0]
-                      + output_signal[i][1] * output_signal[i][1]);
-      sum_mag_out += mag;
-   }
-   /*
-   T avg_mag = sum_mag_in / static_cast<T>(number_of_samples);
-   std::printf("Average magnitude of input signal: %.24f\n",
-               static_cast<float>(avg_mag));
-   avg_mag = sum_mag_out / static_cast<T>(output_size);
-   std::printf("Average magnitude of output signal: %.24f\n",
-               static_cast<float>(avg_mag));
+   end = std::chrono::high_resolution_clock::now();
+   duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+   printf("%s_output_signal write duration: %lld microseconds\n", prefix.c_str(), (long long)duration);
 
 
-   // Print the first 10 output samples.
-   std::printf("First 10 output samples:\n");
-   for(size_t i = 0; i < (output_size < 10 ? output_size : 10); ++i)
-   {
-      std::printf("(%.24f, %.24f)\n", output_signal[i][0], output_signal[i][1]);
-   }
-   */
-
-   // Clean up.
+   // Clean up allocated memory.
    delete[] input_signal;
    delete[] output_signal;
 }
 
-inline void
-polyphase_resampler_double_test(void)
+// The following function tests the circular_polyphase_resample implementation.
+// The structure is analogous to the previous function; however, we use parameters suited
+// for circular buffering (for example, a different input sampling rate and a larger number of samples).
+template<typename T, typename T_data>
+inline void test_circular_polyphase_resampler(const std::string &prefix,
+                                              size_t number_of_samples,
+                                              T input_rate,
+                                              T output_rate,
+                                              int filter_order,
+                                              T rolloff)
 {
-   using T          = double;
-   using T_data     = complex_double;
-   T   input_rate   = static_cast<T>(60e6);
-   T   output_rate  = static_cast<T>(1.92e6);
-   T   rolloff      = T(0.01);
-   int filter_order = 1 << 12;   // 1 << 10 sufficient for RF sampling rates
+   std::vector<T> full_filter = design_raised_cosine_filter(input_rate, output_rate, filter_order, rolloff);
 
-   std::vector<T> full_filter = design_raised_cosine_filter(input_rate,
-                                                            output_rate,
-                                                            filter_order,
-                                                            rolloff);
-
-   FILE* file_coeff = std::fopen("double_filter_coefficients.txt", "w");
-   if(file_coeff == nullptr)
+   auto start = std::chrono::high_resolution_clock::now();
+   std::string coeff_file_name = prefix + "_filter_coefficients.txt";
+   FILE* file_coeff = std::fopen(coeff_file_name.c_str(), "w");
+   if (file_coeff == nullptr)
    {
-      std::perror("Error opening double_filter_coefficients.txt for writing");
+      std::perror(("Error opening " + coeff_file_name + " for writing").c_str());
       return;
    }
-   for(size_t i = 0; i < full_filter.size(); ++i)
+   for (size_t i = 0; i < full_filter.size(); ++i)
    {
-      // Print with conditional formatting for the sign.
-      if(full_filter[i] >= 0)
+      if (full_filter[i] >= 0)
          std::fprintf(file_coeff, "+%.24f\n", full_filter[i]);
       else
          std::fprintf(file_coeff, "%.24f\n", full_filter[i]);
    }
    std::fclose(file_coeff);
+   auto end = std::chrono::high_resolution_clock::now();
+   auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+   printf("%s_filter_coefficients_write duration: %lld microseconds\n", prefix.c_str(), (long long)duration);
 
 
-   // Generate an input signal: a pure tone at 1.92 MHz / 2 (within the
-   // passband).
-   size_t  number_of_samples    = 10000;
-   T_data* input_signal         = new T_data[number_of_samples];
-   T       tone_freq_passband   = (output_rate / 2) - 8*(output_rate / 316);
-   T       tone_freq_rejectband = (output_rate / 2) + 8*(output_rate / 316);
-   for(size_t n = 0; n < number_of_samples; ++n)
+   T_data* input_signal = new T_data[number_of_samples];
+   T tone_freq_passband   = (output_rate / 2) - 8 * (output_rate / 316);
+   T tone_freq_rejectband = (output_rate / 2) + 8 * (output_rate / 316);
+   for (size_t n = 0; n < number_of_samples; ++n)
    {
-      T t                = static_cast<T>(n) / input_rate;
+      T t = static_cast<T>(n) / input_rate;
       input_signal[n][0] = std::cos(2.0 * M_PI * tone_freq_passband * t);
       input_signal[n][1] = std::sin(2.0 * M_PI * tone_freq_passband * t);
       input_signal[n][0] += std::cos(2.0 * M_PI * tone_freq_rejectband * t);
       input_signal[n][1] += std::sin(2.0 * M_PI * tone_freq_rejectband * t);
    }
 
-   // Resample using the polyphase resampler.
-   size_t  output_size   = 0;
-   T_data* output_signal = polyphase_resample<T_data, T>(input_signal,
-                                                         number_of_samples,
-                                                         input_rate,
-                                                         output_rate,
-                                                         full_filter,
-                                                         output_size);
+   size_t output_size = 0;
+   start = std::chrono::high_resolution_clock::now();
+   T_data* output_signal = circular_polyphase_resample<T_data, T>(input_signal,
+                                                                  number_of_samples,
+                                                                  input_rate,
+                                                                  output_rate,
+                                                                  full_filter,
+                                                                  output_size);
+   end = std::chrono::high_resolution_clock::now();
+   duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+   printf("%s circular_polyphase_resample Duration: %lld microseconds\n", prefix.c_str(), (long long)duration);
+   printf("number of output samples: %ld \n", output_size);
 
-
-   FILE* file_in = std::fopen("double_input_signal.txt", "w");
-   if(file_in == nullptr)
+   start = std::chrono::high_resolution_clock::now();
+   std::string input_file_name = prefix + "_input_signal.txt";
+   FILE* file_in = std::fopen(input_file_name.c_str(), "w");
+   if (file_in == nullptr)
    {
-      std::perror("Error opening double_input_signal.txt for writing");
+      std::perror(("Error opening " + input_file_name + " for writing").c_str());
       delete[] input_signal;
       delete[] output_signal;
       return;
    }
-   for(size_t i = 0; i < number_of_samples; ++i)
+   for (size_t i = 0; i < number_of_samples; ++i)
    {
-      // Print with conditional formatting for the sign.
-      if(input_signal[i][1] >= 0)
-         std::fprintf(file_in,
-                      "%.24f+%.24fi\n",
-                      input_signal[i][0],
-                      input_signal[i][1]);
+      if (input_signal[i][1] >= 0)
+         std::fprintf(file_in, "%.24f+%.24fi\n", input_signal[i][0], input_signal[i][1]);
       else
-         std::fprintf(file_in,
-                      "%.24f%.24fi\n",
-                      input_signal[i][0],
-                      input_signal[i][1]);
+         std::fprintf(file_in, "%.24f%.24fi\n", input_signal[i][0], input_signal[i][1]);
    }
    std::fclose(file_in);
+   end = std::chrono::high_resolution_clock::now();
+   duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+   printf("%s_input_signal write duration: %lld microseconds\n", prefix.c_str(), (long long)duration);
 
-   // Write the output signal to a text file.
-   FILE* file_out = std::fopen("double_output_signal.txt", "w");
-   if(file_out == nullptr)
+   start = std::chrono::high_resolution_clock::now();
+   std::string output_file_name = prefix + "_output_signal.txt";
+   FILE* file_out = std::fopen(output_file_name.c_str(), "w");
+   if (file_out == nullptr)
    {
-      std::perror("Error opening double_output_signal.txt for writing");
+      std::perror(("Error opening " + output_file_name + " for writing").c_str());
       delete[] input_signal;
       delete[] output_signal;
       return;
    }
-   for(size_t i = 0; i < output_size; ++i)
+   for (size_t i = 0; i < output_size; ++i)
    {
-      if(output_signal[i][1] >= 0)
-         std::fprintf(file_out,
-                      "%.24f+%.24fi\n",
-                      output_signal[i][0],
-                      output_signal[i][1]);
+      if (output_signal[i][1] >= 0)
+         std::fprintf(file_out, "%.24f+%.24fi\n", output_signal[i][0], output_signal[i][1]);
       else
-         std::fprintf(file_out,
-                      "%.24f%.24fi\n",
-                      output_signal[i][0],
-                      output_signal[i][1]);
+         std::fprintf(file_out, "%.24f%.24fi\n", output_signal[i][0], output_signal[i][1]);
    }
    std::fclose(file_out);
+   end = std::chrono::high_resolution_clock::now();
+   duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+   printf("%s_output_signal write duration: %lld microseconds\n", prefix.c_str(), (long long)duration);
 
-   // Compute the average magnitude of the signals
-   T sum_mag_in  = 0;
-   T sum_mag_out = 0;
-   for(size_t i = 0; i < output_size; ++i)
-   {
-      T mag = std::sqrt(input_signal[i][0] * input_signal[i][0]
-                        + input_signal[i][1] * input_signal[i][1]);
-      sum_mag_in += mag;
-
-      mag = std::sqrt(output_signal[i][0] * output_signal[i][0]
-                      + output_signal[i][1] * output_signal[i][1]);
-      sum_mag_out += mag;
-   }
-   /*
-   T avg_mag = sum_mag_in / static_cast<T>(number_of_samples);
-   std::printf("Average magnitude of input signal: %.24f\n",
-               static_cast<float>(avg_mag));
-   avg_mag = sum_mag_out / static_cast<T>(output_size);
-   std::printf("Average magnitude of output signal: %.24f\n",
-               static_cast<float>(avg_mag));
-
-
-   // Print the first 10 output samples.
-   std::printf("First 10 output samples:\n");
-   for(size_t i = 0; i < (output_size < 10 ? output_size : 10); ++i)
-   {
-      std::printf("(%.24f, %.24f)\n", output_signal[i][0], output_signal[i][1]);
-   }
-   */
-
-   // Clean up.
    delete[] input_signal;
    delete[] output_signal;
 }
 
-
-int
-main(void)
+int main(void)
 {
-   polyphase_resampler_float_test();
-   polyphase_resampler_double_test();
+   uint16_t filter_size = 1 << 8;
+   test_polyphase_resampler<float, complex_float>("polyphase_float",
+                                                    10000,
+                                                    static_cast<float>(60e6),
+                                                    static_cast<float>(1.92e6),
+                                                    filter_size,
+                                                    0.01f);
+   test_polyphase_resampler<double, complex_double>("polyphase_double",
+                                                    10000,
+                                                    static_cast<double>(60e6),
+                                                    static_cast<double>(1.92e6),
+                                                    filter_size,
+                                                    0.01);
+
+   test_circular_polyphase_resampler<float, complex_float>("circular_float",
+                                                           30720000,
+                                                           static_cast<float>(30.72e6),
+                                                           static_cast<float>(1.92e6),
+                                                           filter_size,
+                                                           0.01f);
+   test_circular_polyphase_resampler<double, complex_double>("circular_double",
+                                                            30720000,
+                                                            static_cast<double>(30.72e6),
+                                                            static_cast<double>(1.92e6),
+                                                            filter_size,
+                                                            0.01);
+
    return 0;
 }
